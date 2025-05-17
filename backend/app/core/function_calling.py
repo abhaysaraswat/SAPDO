@@ -9,6 +9,31 @@ import json
 FUNCTION_SCHEMAS = [
     {
         "type": "function",
+        "name": "get_filtered_count",
+        "description": "Get the count of records in a table with optional filtering",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Name of the table to count records from"
+                },
+                "column_name": {
+                    "type": "string",
+                    "description": "Name of the column to count (usually '*' or a specific column)"
+                },
+                "filter_condition": {
+                    "type": ["string", "null"],
+                    "description": "Optional SQL WHERE condition to filter the records (without the 'WHERE' keyword)"
+                }
+            },
+            "required": ["table_name", "column_name", "filter_condition"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    {
+        "type": "function",
         "name": "get_table_columns",
         "description": "Get column information for a specified database table",
         "parameters": {
@@ -94,6 +119,42 @@ def get_table_columns(args):
     except Exception as e:
         return json.dumps({"error": str(e)})
 
+def get_filtered_count(args):
+    """
+    Get the count of records in a table with optional filtering.
+    
+    Args:
+        args: Dictionary containing function arguments
+            - table_name: Name of the table to count records from
+            - column_name: Name of the column to count
+            - filter_condition: Optional SQL WHERE condition to filter the records
+            
+    Returns:
+        JSON string containing the count result
+    """
+    table_name = args.get("table_name")
+    column_name = args.get("column_name")
+    filter_condition = args.get("filter_condition")
+    
+    # Handle null or empty filter_condition
+    if not filter_condition:
+        filter_condition = None
+    
+    supabase = get_supabase_client()
+    
+    try:
+        result = supabase.rpc("get_filtered_count", {
+            "p_table_name": table_name,
+            "p_column_name": column_name,
+            "p_filter_condition": filter_condition
+        }).execute()
+        
+        # Process the result to extract the count
+        count = result.data if result.data else 0
+        return json.dumps({"count": count})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
 def query_table_data(args):
     """
     Run a query against a database table to retrieve data using Supabase's query builder.
@@ -169,5 +230,6 @@ def query_table_data(args):
 # Function dispatcher
 FUNCTION_MAP = {
     "get_table_columns": get_table_columns,
-    "query_table_data": query_table_data
+    "query_table_data": query_table_data,
+    "get_filtered_count": get_filtered_count
 }
