@@ -1,8 +1,27 @@
 'use client';
 
-import { Box, Avatar, Typography } from '@mui/material';
+import { Box, Avatar, Typography, CircularProgress } from '@mui/material';
+import { useEffect, useState } from 'react';
 
 export default function ChatMessage({ message, isUser }) {
+  const [displayContent, setDisplayContent] = useState(message.content);
+  const [showCursor, setShowCursor] = useState(false);
+  
+  // Blinking cursor effect for thinking and streaming messages
+  useEffect(() => {
+    if (message.isThinking || message.isStreaming) {
+      const cursorInterval = setInterval(() => {
+        setShowCursor(prev => !prev);
+      }, 500);
+      
+      return () => clearInterval(cursorInterval);
+    }
+  }, [message.isThinking, message.isStreaming]);
+  
+  // Update content when message changes
+  useEffect(() => {
+    setDisplayContent(message.content);
+  }, [message.content]);
   return (
     <Box 
       sx={{ 
@@ -48,16 +67,45 @@ export default function ChatMessage({ message, isUser }) {
           )
         }}
       >
-        <Typography 
-          variant="body1" 
-          sx={{ 
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            lineHeight: 1.5
-          }}
-        >
-          {message.content}
-        </Typography>
+        {message.isThinking ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                lineHeight: 1.5,
+                fontStyle: 'italic',
+                color: 'text.secondary'
+              }}
+            >
+              Thinking...
+            </Typography>
+            <CircularProgress size={16} sx={{ ml: 1 }} />
+          </Box>
+        ) : message.isStreaming ? (
+          <Typography 
+            variant="body1" 
+            sx={{ 
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              lineHeight: 1.5
+            }}
+          >
+            {displayContent}{showCursor ? '|' : ''}
+          </Typography>
+        ) : (
+          <Typography 
+            variant="body1" 
+            sx={{ 
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              lineHeight: 1.5
+            }}
+          >
+            {message.content}
+          </Typography>
+        )}
         
         {message.timestamp && (
           <Typography 

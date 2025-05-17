@@ -10,14 +10,20 @@ import {
   ToggleButton,
   Chip,
   IconButton,
-  Tooltip
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
+import ExistingDatasetSelector from '../dataset/ExistingDatasetSelector';
 import { 
   Add as AddIcon,
   BarChart as BarChartIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Storage as StorageIcon
 } from '@mui/icons-material';
 
 // Initial welcome message
@@ -35,21 +41,76 @@ export default function ChatInterface({ dataset }) {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState('general');
   const [selectedDataset, setSelectedDataset] = useState(null);
+  const [datasetDialogOpen, setDatasetDialogOpen] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const [streamingComplete, setStreamingComplete] = useState(true);
   const messagesEndRef = useRef(null);
   
   // Set the selected dataset when the dataset prop changes
   useEffect(() => {
     if (dataset) {
       setSelectedDataset(dataset);
+    } else {
+      // If no dataset is provided, open the dataset selection dialog automatically
+      setDatasetDialogOpen(true);
     }
   }, [dataset]);
+  
+  // Handle opening the dataset selection dialog
+  const handleOpenDatasetDialog = () => {
+    setDatasetDialogOpen(true);
+  };
+  
+  // Handle closing the dataset selection dialog
+  const handleCloseDatasetDialog = () => {
+    // Only allow closing the dialog if a dataset is selected
+    if (selectedDataset) {
+      setDatasetDialogOpen(false);
+    }
+  };
+  
+  // Handle dataset selection
+  const handleDatasetSelect = (datasets) => {
+    if (datasets && datasets.length > 0) {
+      setSelectedDataset(datasets[0]);
+    }
+    setDatasetDialogOpen(false);
+  };
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
   
+  // Simulate text streaming effect
+  const simulateTextStreaming = (text) => {
+    setStreamingComplete(false);
+    setStreamingText('');
+    
+    let i = 0;
+    const speed = 10; // milliseconds per character
+    
+    const streamInterval = setInterval(() => {
+      if (i < text.length) {
+        setStreamingText(prev => prev + text.charAt(i));
+        i++;
+      } else {
+        clearInterval(streamInterval);
+        setStreamingComplete(true);
+      }
+    }, speed);
+    
+    return () => clearInterval(streamInterval);
+  };
+  
   const handleSendMessage = async (content) => {
+    if (!selectedDataset) {
+      // If no dataset is selected, open the dataset selection dialog
+      setDatasetDialogOpen(true);
+      return;
+    }
+    
     // Add user message
     const userMessage = {
       id: messages.length + 1,
@@ -59,12 +120,23 @@ export default function ChatInterface({ dataset }) {
     };
     
     setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
+    
+    // Add a temporary "Thinking..." message
+    const thinkingMessageId = messages.length + 2;
+    setIsThinking(true);
+    setMessages((prev) => [...prev, {
+      id: thinkingMessageId,
+      role: 'assistant',
+      content: 'Thinking...',
+      timestamp: new Date().toISOString(),
+      isThinking: true,
+    }]);
     
     try {
       // Get all previous messages to include in the payload
       const previousMessages = messages
         .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+        .filter(msg => !msg.isThinking) // Filter out thinking messages
         .map(msg => ({
           role: msg.role,
           content: msg.content
@@ -118,15 +190,57 @@ export default function ChatInterface({ dataset }) {
         throw new Error('No assistant response found in chat data');
       }
       
-      // Add AI response to messages
+      // Remove the thinking message
+      setMessages((prev) => prev.filter(msg => msg.id !== thinkingMessageId));
+      setIsThinking(false);
+      
+      // Start streaming the response
+      const responseContent = aiResponseData.content;
+      
+      // Add AI response to messages with empty content initially
       const aiMessage = {
-        id: messages.length + 2,
+        id: thinkingMessageId, // Reuse the ID to replace the thinking message
         role: 'assistant',
-        content: aiResponseData.content,
+        content: '',
         timestamp: aiResponseData.timestamp || new Date().toISOString(),
+        isStreaming: true,
       };
       
       setMessages((prev) => [...prev, aiMessage]);
+      
+      // Simulate streaming effect
+      const cleanupStreaming = simulateTextStreaming(responseContent);
+      
+      // Update the message content as the streaming text changes
+      const streamingInterval = setInterval(() => {
+        setMessages((prev) => 
+          prev.map(msg => 
+            msg.id === thinkingMessageId 
+              ? { ...msg, content: streamingText, isStreaming: !streamingComplete } 
+              : msg
+          )
+        );
+        
+        // If streaming is complete, clear the interval
+        if (streamingComplete) {
+          clearInterval(streamingInterval);
+          
+          // Final update with the complete content
+          setMessages((prev) => 
+            prev.map(msg => 
+              msg.id === thinkingMessageId 
+                ? { ...msg, content: responseContent, isStreaming: false } 
+                : msg
+            )
+          );
+        }
+      }, 50);
+      
+      // Cleanup function
+      return () => {
+        cleanupStreaming();
+        clearInterval(streamingInterval);
+      };
     } catch (error) {
       console.error('Error sending message:', error);
       
@@ -227,15 +341,16 @@ export default function ChatInterface({ dataset }) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Button 
               variant="outlined" 
-              startIcon={<AddIcon />}
+              startIcon={<StorageIcon />}
               size="small"
+              onClick={handleOpenDatasetDialog}
               sx={{ 
                 borderRadius: '20px',
                 textTransform: 'none',
                 px: 2
               }}
             >
-              Add files
+              {selectedDataset ? 'Change Dataset' : 'Select Dataset'}
             </Button>
             
             {selectedDataset && (
@@ -297,8 +412,59 @@ export default function ChatInterface({ dataset }) {
           </Box>
         </Box>
         
-        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        {selectedDataset ? (
+          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        ) : (
+          <Box sx={{ 
+            p: 2, 
+            backgroundColor: '#f5f5f5', 
+            borderRadius: 2, 
+            textAlign: 'center',
+            border: '1px dashed #ccc'
+          }}>
+            <Typography variant="body1" color="text.secondary">
+              Please select a dataset to start chatting
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<StorageIcon />}
+              onClick={handleOpenDatasetDialog}
+              sx={{ mt: 2 }}
+            >
+              Select Dataset
+            </Button>
+          </Box>
+        )}
       </Box>
+      
+      {/* Dataset Selection Dialog */}
+      <Dialog
+        open={datasetDialogOpen}
+        onClose={handleCloseDatasetDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Select a Dataset
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Select a dataset to use for this chat. The AI will be able to query and analyze the data from the selected dataset.
+          </Typography>
+          <ExistingDatasetSelector onSelect={handleDatasetSelect} />
+        </DialogContent>
+        <DialogActions>
+          {selectedDataset && (
+            <Button onClick={handleCloseDatasetDialog}>Cancel</Button>
+          )}
+          {!selectedDataset && (
+            <Typography variant="caption" color="text.secondary">
+              You must select a dataset to continue
+            </Typography>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
