@@ -254,7 +254,7 @@ def generate_ai_response(messages: str, table_name: Optional[str] = None) -> str
     Generate an AI response based on the user's message using OpenAI function calling.
     
     Args:
-        user_message: The message from the user
+        messages: The conversation messages
         table_name: Optional table name to query directly
         
     Returns:
@@ -265,8 +265,6 @@ def generate_ai_response(messages: str, table_name: Optional[str] = None) -> str
         
         client = OpenAI()
         
-        # Initial message to the model
-        
         # If table_name is provided, add it to the system message
         if table_name:
             messages.insert(0, {
@@ -274,48 +272,80 @@ def generate_ai_response(messages: str, table_name: Optional[str] = None) -> str
                 "content": f"You are an AI assistant that helps users query data from the '{table_name}' table. Use the provided functions to get information about the table structure and to query data."
             })
         
-        # First, call the model to see if it wants to use a function
-        response = client.responses.create(
-            model="gpt-4.1",
-            input=messages,
-            tools=FUNCTION_SCHEMAS
-        )
+        # Initialize response
+        response = None
+        max_iterations = 5  # Prevent infinite loops
+        iterations = 0
         
-        # Check if the model wants to call a function
-        if response.output and any(item.type == "function_call" for item in response.output):
-            # Process each function call
-            for tool_call in response.output:
-                if tool_call.type != "function_call":
-                    continue
-                    
-                # Get function details
-                function_name = tool_call.name
-                function_args = json.loads(tool_call.arguments)
-                
-                # Execute the function
-                if function_name in FUNCTION_MAP:
-                    function_result = FUNCTION_MAP[function_name](function_args)
-                    
-                    # Add the function call and result to the conversation
-                    messages.append(tool_call)
-                    messages.append({
-                        "type": "function_call_output",
-                        "call_id": tool_call.call_id,
-                        "output": str(function_result)
-                    })
+        # Continue making function calls until there are no more or we hit the limit
+        while iterations < max_iterations:
+            iterations += 1
             
-            # Call the model again with the function results
-            final_response = client.responses.create(
+            # Call the model
+            response = client.responses.create(
                 model="gpt-4.1",
                 input=messages,
                 tools=FUNCTION_SCHEMAS
             )
             
-            # Return the final text response
-            return final_response.output_text
-        else:
-            # If no function was called, return the original response
-            return response.output_text
+            # Check if the model wants to call a function
+            has_function_calls = response.output and any(item.type == "function_call" for item in response.output)
+            
+            if not has_function_calls:
+                # No more function calls, we're done
+                break
+                
+            # Process each function call
+            function_call_success = True  # Track if all function calls succeeded
+            
+            for tool_call in response.output:
+                if tool_call.type != "function_call":
+                    continue
+                    
+                try:
+                    # Get function details
+                    function_name = tool_call.name
+                    function_args = json.loads(tool_call.arguments)
+                    
+                    # Execute the function
+                    if function_name in FUNCTION_MAP:
+                        function_result = FUNCTION_MAP[function_name](function_args)
+                        
+                        # Add the function call and result to the conversation
+                        messages.append(tool_call)
+                        messages.append({
+                            "type": "function_call_output",
+                            "call_id": tool_call.call_id,
+                            "output": str(function_result)
+                        })
+                        
+                        print(f"Function call {function_name} succeeded")
+                    else:
+                        # Function not found
+                        function_call_success = False
+                        print(f"Function {function_name} not found in FUNCTION_MAP")
+                        
+                except Exception as e:
+                    # Function call failed
+                    function_call_success = False
+                    error_message = str(e)
+                    print(f"Error executing function {tool_call.name}: {error_message}")
+                    
+                    # Add error message to conversation
+                    messages.append(tool_call)
+                    messages.append({
+                        "type": "function_call_output",
+                        "call_id": tool_call.call_id,
+                        "output": json.dumps({"error": error_message})
+                    })
+            
+            # If all function calls failed, break to avoid infinite loops
+            if not function_call_success and iterations >= 2:
+                print("Breaking loop due to function call failures")
+                break
+        
+        # Return the final text response
+        return response.output_text if response else "I'm sorry, I encountered an error while processing your request."
     except Exception as e:
         # Fallback response in case of error
         print(f"Error generating AI response: {str(e)}")
