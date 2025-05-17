@@ -1,0 +1,29 @@
+# FastAPI and server
+fastapi==0.104.1
+uvicorn==0.23.2
+python-multipart==0.0.6
+pydantic>=2.8.0
+pydantic-settings>=2.5.0
+
+# Supabase
+httpx<0.28
+supabase==2.8.1
+gotrue==2.9.1
+storage3==0.8.0
+postgrest==0.17.0
+
+# Data processing
+pandas==2.1.1
+numpy==1.26.0
+
+# LlamaIndex and LLM
+llama-index-core>=0.12.0
+llama-index-llms-openai>=0.3.0
+llama-index-readers-database>=0.2.0
+llama-index-agent-openai>=0.4.0
+openai>=1.0.0
+
+# Utilities
+python-dotenv>=1.0.1
+dotenv
+psycopg2-binary

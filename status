@@ -1,0 +1,81 @@
+column variable handle(done)
+
+issue:
+{
+  "result": {
+    "text": [
+      "im feeling rather rotten so im not very ambitious right now",
+      "im updating my blog because i feel shitty",
+      "i never make her separate from me because i don t ever want her to feel like i m ashamed with her",
+      "i left with my bouquet of red and yellow tulips under my arm feeling slightly more optimistic than when i arrived",
+      "i was feeling a little vain when i did this one",
+      "i cant walk into a shop anywhere where i do not feel uncomfortable",
+      "i felt anger when at the end of a telephone call",
+      "i explain why i clung to a relationship with a boy who was in many ways immature and uncommitted despite the excitement i should have been feeling for getting accepted into the masters program at the university of virginia",
+      "i like to have the same breathless feeling as a reader eager to see what will happen next",
+      "i jest i feel grumpy tired and pre menstrual which i probably am but then again its only been a week and im about as fit as a walrus on vacation for the summer"
+    ],
+    "label": [
+      "0",
+      "0",
+      "0",
+      "1",
+      "0",
+      "4",
+      "3",
+      "1",
+      "1",
+      "3"
+    ]
+  }
+}
+
+(in small letter)
+
+
+
+
+
+
+
+
+
+------------------------------
+
+
+{
+  "prompt_config": [
+    {
+      "name": "new promt",
+      "messages": [
+        {
+          "role": "user",
+          "content": "You are a text sentiment analysis model tasked with classifying emotional tones in a list of statements. Your goal is to categorize the emotions expressed in each statement according to predefined labels. Follow these steps to perform the task:\n\nFirst, carefully read each sentence in the list of statements: <statements>\n{{TEXT}}\n</statements>\n\nNext, analyze the emotional tone of each statement:\n- Identify the primary emotion or feeling conveyed in the statement.\n- Assign the corresponding label that best reflects the sentiment.\n\nFor classification, use the following labels:\n- 0: Neutral or mildly positive emotions (e.g., mild self-reflection, casual statements).\n- 1: Mild frustration, discomfort, or a neutral tone with minor emotional undertones.\n- 3: Strong frustration, annoyance, or irritation.\n- 4: Positive or hopeful tone, optimistic outlook.\n\nClassify each statement according to the provided labels:\n- Review each statement thoroughly.\n- Choose the most accurate label based on the emotional tone of the statement.\n\nYour final output should match the format below, with each statement followed by its corresponding label:\n<classification_result>\n<statement>[Statement text]</statement>\n<label>[Assigned label]</label>\n</classification_result>\n\nRemember to maintain consistency in emotional classification and ensure each label accurately reflects the sentiment of the statement.\n\nWrite your classification results in the following format:\n<classification_result>\n<statement>[Statement]</statement>\n<label>[Label]</label>\n</classification_result>"
+        }
+      ],
+      "variable_names": {
+    "text": [
+      "im feeling rather rotten so im not very ambitious right now",
+      "im updating my blog because i feel shitty"
+    ],
+    "label": [
+      "0",
+      "3"
+    ]
+  }
+    }
+  ],
+   "model": "gpt-4o",
+  "user_eval_template_ids": [],
+   "instructions": [
+        "Assess the generated email's adherence to the provided email sample format, including structure, tone, and style.",
+        "Evaluate the email's content relevance to the conversation context and query, ensuring all key points from the chat history are addressed.",
+        "Analyze the email's language quality, including grammar, spelling, and appropriate level of formality based on the conversation and sample.",
+        "Examine the email for completeness, checking if it includes all necessary components such as subject line, greeting, body, and closing.",
+        "Judge the overall effectiveness of the email in achieving its intended purpose, considering factors such as clarity, persuasiveness, and professionalism."
+    ]
+}
+
+
+
+
