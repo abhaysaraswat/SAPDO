@@ -8,6 +8,7 @@ SAPDO is a modern data analysis platform that combines the power of AI with data
 
 ### 📊 Dataset Management
 - **Upload CSV Files**: Easily upload CSV files that are automatically converted to database tables
+- **Wide CSV Support**: Process CSV files with thousands of columns using DuckDB and Parquet
 - **Dataset Organization**: Browse, search, and manage your datasets
 - **Metadata Tracking**: Track dataset information including number of datapoints and descriptions
 
@@ -24,6 +25,8 @@ SAPDO is a modern data analysis platform that combines the power of AI with data
 
 ### 🛠️ Technical Features
 - **Supabase Integration**: Seamless integration with Supabase for database management
+- **DuckDB & Parquet**: Support for wide datasets with thousands of columns
+- **Vector Search**: Semantic search for columns in large datasets
 - **OpenAI Integration**: Leverages OpenAI's function calling capabilities for intelligent queries
 - **Modern UI**: Clean, responsive interface built with Next.js and Material UI
 - **API-First Design**: Well-structured API endpoints for all functionality
@@ -34,8 +37,12 @@ SAPDO is built with a modern stack:
 
 - **Frontend**: Next.js with Material UI
 - **Backend**: FastAPI (Python)
-- **Database**: Supabase (PostgreSQL)
+- **Databases**:
+  - Supabase (PostgreSQL) for regular datasets
+  - DuckDB with Parquet for wide datasets (10,000+ columns)
+  - SQLite for metadata storage
 - **AI**: OpenAI API with function calling
+- **Vector Store**: Sentence Transformers for semantic column search
 
 The application is structured as follows:
 
@@ -185,7 +192,46 @@ query_table_data({
         "operator": "greater_than"
     }
 })
+
+# Check dataset storage type
+check_dataset_storage({"dataset_id": "123e4567-e89b-12d3-a456-426614174000"})
+
+# Get column recommendations for wide datasets
+get_column_recommendations({"query_text": "Find columns related to temperature"})
+
+# Query a DuckDB dataset
+query_duckdb_dataset({
+    "dataset_id": "123e4567-e89b-12d3-a456-426614174000",
+    "query_text": "SELECT * FROM dataset_table LIMIT 10"
+})
 ```
+
+## Wide CSV Processing
+
+SAPDO now supports processing CSV files with thousands of columns, which exceeds the column limit of PostgreSQL/Supabase (1,600 columns). The wide CSV processor uses:
+
+- **DuckDB**: A high-performance analytical database that can efficiently handle wide tables
+- **Parquet**: A columnar storage format that provides efficient storage and retrieval
+- **SQLite**: For storing metadata about datasets and columns
+- **Vector Store**: For semantic search of columns
+
+### How It Works
+
+1. When a CSV file is uploaded, the system checks the number of columns:
+   - If the file has fewer than 1,600 columns, it uses the standard Supabase processing
+   - If the file has more than 1,600 columns, it uses the wide CSV processor
+
+2. The wide CSV processor:
+   - Processes the CSV file in chunks to avoid memory issues
+   - Converts the data to Parquet format for efficient storage
+   - Stores metadata about the dataset and columns in SQLite
+   - Creates embeddings for columns to enable semantic search
+
+3. The data can then be queried using:
+   - SQL queries via DuckDB
+   - Natural language queries via the vector store
+
+For more details, see the [data/README.md](data/README.md) file.
 
 ## Contributing
 

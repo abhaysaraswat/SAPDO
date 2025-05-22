@@ -4,9 +4,92 @@ Function calling utilities for OpenAI API integration.
 from ..core.supabase import get_supabase_client
 from ..core.llama_index_utils import query_database
 import json
+import os
+from pathlib import Path
+
+# Try to import the wide CSV processor
+try:
+    from ..core.wide_csv_processor import WideCsvProcessor
+    WIDE_CSV_PROCESSOR_AVAILABLE = True
+except ImportError:
+    WIDE_CSV_PROCESSOR_AVAILABLE = False
+
+# Initialize the wide CSV processor if available
+wide_csv_processor = None
+if WIDE_CSV_PROCESSOR_AVAILABLE:
+    try:
+        wide_csv_processor = WideCsvProcessor()
+    except Exception as e:
+        print(f"Error initializing WideCsvProcessor: {str(e)}")
 
 # Function schemas
 FUNCTION_SCHEMAS = [
+    # Add a function to check if a dataset is stored in DuckDB
+    {
+        "type": "function",
+        "name": "check_dataset_storage",
+        "description": "Check if a dataset is stored in Supabase or DuckDB",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "dataset_id": {
+                    "type": "string",
+                    "description": "ID of the dataset to check"
+                }
+            },
+            "required": ["dataset_id"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    # Add a function to get column recommendations based on a query
+    {
+        "type": "function",
+        "name": "get_column_recommendations",
+        "description": "Get column recommendations based on a query",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query_text": {
+                    "type": "string",
+                    "description": "Query text to find relevant columns"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of recommendations to return"
+                }
+            },
+            "required": ["query_text"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    # Add a function to query a DuckDB dataset
+    {
+        "type": "function",
+        "name": "query_duckdb_dataset",
+        "description": "Run a SQL query against a DuckDB dataset",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "dataset_id": {
+                    "type": "string",
+                    "description": "ID of the dataset to query"
+                },
+                "query_text": {
+                    "type": "string",
+                    "description": "SQL query or natural language query"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of rows to return"
+                }
+            },
+            "required": ["dataset_id", "query_text"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
     {
         "type": "function",
         "name": "get_filtered_count",
@@ -227,9 +310,126 @@ def query_table_data(args):
         print(error_msg)
         return json.dumps({"error": error_msg})
 
+def check_dataset_storage(args):
+    """
+    Check if a dataset is stored in Supabase or DuckDB.
+    
+    Args:
+        args: Dictionary containing function arguments
+            - dataset_id: ID of the dataset to check
+            
+    Returns:
+        JSON string containing storage information
+    """
+    dataset_id = args.get("dataset_id")
+    
+    # Check if the dataset is in DuckDB
+    if WIDE_CSV_PROCESSOR_AVAILABLE and wide_csv_processor:
+        try:
+            duckdb_dataset = wide_csv_processor.get_dataset(dataset_id)
+            if duckdb_dataset:
+                return json.dumps({
+                    "storage_type": "duckdb",
+                    "dataset_id": dataset_id,
+                    "table_name": duckdb_dataset.get("table_name"),
+                    "column_count": duckdb_dataset.get("column_count", 0),
+                    "row_count": duckdb_dataset.get("row_count", 0)
+                })
+        except Exception as e:
+            print(f"Error checking DuckDB dataset: {str(e)}")
+    
+    # Check if the dataset is in Supabase
+    supabase = get_supabase_client()
+    try:
+        response = supabase.table("datasets").select("*").eq("id", dataset_id).execute()
+        if response.data:
+            dataset = response.data[0]
+            return json.dumps({
+                "storage_type": "supabase",
+                "dataset_id": dataset_id,
+                "table_name": dataset.get("table_name"),
+                "number_of_datapoints": dataset.get("number_of_datapoints", 0)
+            })
+    except Exception as e:
+        print(f"Error checking Supabase dataset: {str(e)}")
+    
+    # Dataset not found
+    return json.dumps({
+        "error": f"Dataset not found: {dataset_id}"
+    })
+
+def get_column_recommendations(args):
+    """
+    Get column recommendations based on a query.
+    
+    Args:
+        args: Dictionary containing function arguments
+            - query_text: Query text to find relevant columns
+            - limit: Maximum number of recommendations to return
+            
+    Returns:
+        JSON string containing column recommendations
+    """
+    query_text = args.get("query_text")
+    limit = args.get("limit", 5)
+    
+    if not WIDE_CSV_PROCESSOR_AVAILABLE or not wide_csv_processor:
+        return json.dumps({
+            "error": "Wide CSV processor not available"
+        })
+    
+    try:
+        recommendations = wide_csv_processor.get_column_recommendations(query_text, limit)
+        return json.dumps(recommendations)
+    except Exception as e:
+        return json.dumps({
+            "error": f"Error getting column recommendations: {str(e)}"
+        })
+
+def query_duckdb_dataset(args):
+    """
+    Run a SQL query against a DuckDB dataset.
+    
+    Args:
+        args: Dictionary containing function arguments
+            - dataset_id: ID of the dataset to query
+            - query_text: SQL query or natural language query
+            - limit: Maximum number of rows to return
+            
+    Returns:
+        JSON string containing query results
+    """
+    dataset_id = args.get("dataset_id")
+    query_text = args.get("query_text")
+    limit = args.get("limit", 1000)
+    
+    if not WIDE_CSV_PROCESSOR_AVAILABLE or not wide_csv_processor:
+        return json.dumps({
+            "error": "Wide CSV processor not available"
+        })
+    
+    try:
+        # Get the dataset
+        dataset = wide_csv_processor.get_dataset(dataset_id)
+        if not dataset:
+            return json.dumps({
+                "error": f"Dataset not found: {dataset_id}"
+            })
+        
+        # Query the dataset
+        result = wide_csv_processor.query_dataset(dataset_id, query_text, limit)
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({
+            "error": f"Error querying DuckDB dataset: {str(e)}"
+        })
+
 # Function dispatcher
 FUNCTION_MAP = {
     "get_table_columns": get_table_columns,
     "query_table_data": query_table_data,
-    "get_filtered_count": get_filtered_count
+    "get_filtered_count": get_filtered_count,
+    "check_dataset_storage": check_dataset_storage,
+    "get_column_recommendations": get_column_recommendations,
+    "query_duckdb_dataset": query_duckdb_dataset
 }
