@@ -2,7 +2,8 @@
 
 SAPDO is a modern data analysis platform that combines the power of AI with database management to provide intuitive data exploration and analysis capabilities. It allows users to upload datasets, chat with an AI assistant about their data, and get insights through natural language queries.
 
-![SAPDO Platform]([https://via.placeholder.com/800x400?text=SAPDO+Platform](https://x.com/abhayysaraswat/status/1923756345972457703))
+[![SAPDO Platform]([https://via.placeholder.com/800x400?text=SAPDO+Platform](https://x.com/abhayysaraswat/status/1923756345972457703))
+](https://x.com/abhayysaraswat/status/1923756345972457703)
 
 ## Features
 
